@@ -22,3 +22,4 @@ __pycache__/
 *.o
 *.so
 *.dylib
+setup_dir.sh
