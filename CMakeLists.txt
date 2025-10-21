@@ -33,7 +33,43 @@ include_directories(${PROJECT_BINARY_DIR}/include)
 link_directories(${LLVM_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
 
+# Enable testing
+enable_testing()
+include(CTest)
+
+# Find GTest from LLVM installation
+# LLVM bundles its own GTest - use that instead of system GTest
+set(LLVM_GTEST_INCLUDE_DIR "${LLVM_INCLUDE_DIRS}/../../src/utils/unittest/googletest/include")
+set(LLVM_GTEST_LIB_DIR "${LLVM_LIBRARY_DIRS}")
+
+# Try to find GTest libraries in LLVM's lib directory
+find_library(GTEST_LIBRARY 
+  NAMES gtest libgtest
+  PATHS ${LLVM_LIBRARY_DIRS}
+  NO_DEFAULT_PATH
+)
+
+find_library(GTEST_MAIN_LIBRARY 
+  NAMES gtest_main libgtest_main
+  PATHS ${LLVM_LIBRARY_DIRS}
+  NO_DEFAULT_PATH
+)
+
+# Fallback: Use LLVM's bundled gtest if separate libraries not found
+if(NOT GTEST_LIBRARY OR NOT GTEST_MAIN_LIBRARY)
+  message(STATUS "Using LLVM's bundled gtest")
+  # On macOS with Homebrew LLVM, gtest is typically linked into LLVM libraries
+  # We'll link against LLVMSupport which includes gtest symbols
+  set(GTEST_LIBRARY "")
+  set(GTEST_MAIN_LIBRARY "")
+  set(LLVM_HAS_GTEST TRUE)
+else()
+  message(STATUS "Found GTest: ${GTEST_LIBRARY}")
+  set(LLVM_HAS_GTEST FALSE)
+endif()
+
 # Subdirectories
 add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(tools)
+add_subdirectory(test)
