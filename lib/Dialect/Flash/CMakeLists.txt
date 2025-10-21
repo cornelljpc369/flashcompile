@@ -1,6 +1,6 @@
 # Flash dialect implementation (empty for now)
 # Build the Flash dialect library
-add_mlir_dialect_library(FlashDialect
+add_mlir_dialect_library(MLIRFlashDialect
   FlashDialect.cpp
   FlashOps.cpp
 
@@ -8,8 +8,8 @@ add_mlir_dialect_library(FlashDialect
   ${PROJECT_SOURCE_DIR}/include/flash/Dialect/Flash
 
   DEPENDS
-  FlashDialectIncGen
-  FlashOpsIncGen
+  MLIRFlashDialectIncGen
+  MLIRFlashOpsIncGen
 
   LINK_LIBS PUBLIC
   MLIRIR
