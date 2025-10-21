@@ -1,6 +1,6 @@
 # Flash dialect implementation (empty for now)
 # Build the Flash dialect library
-add_mlir_dialect_library(MLIRFlashDialect
+add_mlir_dialect_library(FlashDialect
   FlashDialect.cpp
   FlashOps.cpp
 

@@ -254,6 +254,109 @@ bool test_VariousShapes() {
 }
 
 //===----------------------------------------------------------------------===//
+// Test 8: Add Operation Parsing
+//===----------------------------------------------------------------------===//
+
+bool test_AddOpParsing() {
+  MLIRContext ctx;
+  ctx.getOrLoadDialect<FlashDialect>();
+  ctx.getOrLoadDialect<func::FuncDialect>();
+  
+  const char *moduleStr = R"mlir(
+    module {
+      func.func @test(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>) -> tensor<4x4xf32> {
+        %0 = flash.add %arg0, %arg1 : tensor<4x4xf32>, tensor<4x4xf32> -> tensor<4x4xf32>
+        return %0 : tensor<4x4xf32>
+      }
+    }
+  )mlir";
+  
+  OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, &ctx);
+  ASSERT(module, "Module with Add should parse successfully");
+  
+  // Find Add operation
+  bool foundAdd = false;
+  module->walk([&](Operation *op) {
+    if (op->getName().getStringRef() == "flash.add")
+      foundAdd = true;
+  });
+  
+  ASSERT(foundAdd, "Should find flash.add operation");
+  return true;
+}
+
+//===----------------------------------------------------------------------===//
+// Test 9: ReLU Operation Parsing
+//===----------------------------------------------------------------------===//
+
+bool test_ReLUOpParsing() {
+  MLIRContext ctx;
+  ctx.getOrLoadDialect<FlashDialect>();
+  ctx.getOrLoadDialect<func::FuncDialect>();
+  
+  const char *moduleStr = R"mlir(
+    module {
+      func.func @test(%arg0: tensor<4x4xf32>) -> tensor<4x4xf32> {
+        %0 = flash.relu %arg0 : tensor<4x4xf32> -> tensor<4x4xf32>
+        return %0 : tensor<4x4xf32>
+      }
+    }
+  )mlir";
+  
+  OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, &ctx);
+  ASSERT(module, "Module with ReLU should parse successfully");
+  
+  // Find ReLU operation
+  bool foundReLU = false;
+  module->walk([&](Operation *op) {
+    if (op->getName().getStringRef() == "flash.relu")
+      foundReLU = true;
+  });
+  
+  ASSERT(foundReLU, "Should find flash.relu operation");
+  return true;
+}
+
+//===----------------------------------------------------------------------===//
+// Test 10: Simple Layer (MatMul + Add + ReLU)
+//===----------------------------------------------------------------------===//
+
+bool test_SimpleLayer() {
+  MLIRContext ctx;
+  ctx.getOrLoadDialect<FlashDialect>();
+  ctx.getOrLoadDialect<func::FuncDialect>();
+  
+  const char *moduleStr = R"mlir(
+    module {
+      func.func @layer(%input: tensor<8x16xf32>, %weights: tensor<16x32xf32>, %bias: tensor<8x32xf32>) -> tensor<8x32xf32> {
+        %0 = flash.matmul %input, %weights : tensor<8x16xf32>, tensor<16x32xf32> -> tensor<8x32xf32>
+        %1 = flash.add %0, %bias : tensor<8x32xf32>, tensor<8x32xf32> -> tensor<8x32xf32>
+        %2 = flash.relu %1 : tensor<8x32xf32> -> tensor<8x32xf32>
+        return %2 : tensor<8x32xf32>
+      }
+    }
+  )mlir";
+  
+  OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, &ctx);
+  ASSERT(module, "Simple layer should parse successfully");
+  
+  // Count operations
+  int matmulCount = 0, addCount = 0, reluCount = 0;
+  module->walk([&](Operation *op) {
+    StringRef name = op->getName().getStringRef();
+    if (name == "flash.matmul") matmulCount++;
+    if (name == "flash.add") addCount++;
+    if (name == "flash.relu") reluCount++;
+  });
+  
+  ASSERT(matmulCount == 1, "Should have 1 matmul");
+  ASSERT(addCount == 1, "Should have 1 add");
+  ASSERT(reluCount == 1, "Should have 1 relu");
+  
+  return true;
+}
+
+//===----------------------------------------------------------------------===//
 // Main
 //===----------------------------------------------------------------------===//
 
@@ -268,10 +371,13 @@ int main(int argc, char **argv) {
   TEST(F32Types);
   TEST(F64Types);
   TEST(VariousShapes);
+  TEST(AddOpParsing);           // NEW
+  TEST(ReLUOpParsing);          // NEW
+  TEST(SimpleLayer);            // NEW
   
-  llvm::outs() << "[----------] 7 tests from FlashDialect (" 
+  llvm::outs() << "[----------] 10 tests from FlashDialect (" 
                << (passCount + failCount) << " ms total)\n\n";
-  llvm::outs() << "[==========] 7 tests from 1 test suite ran.\n";
+  llvm::outs() << "[==========] 10 tests from 1 test suite ran.\n";
   llvm::outs() << "[  PASSED  ] " << passCount << " tests.\n";
   
   if (failCount > 0) {

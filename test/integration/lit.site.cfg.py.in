@@ -1,0 +1,16 @@
+# -*- Python -*-
+
+import sys
+import os
+
+# Get the directory containing this config file
+config.test_source_root = os.path.dirname(__file__)
+
+# Paths from CMake
+config.llvm_tools_dir = r"@LLVM_TOOLS_BINARY_DIR@"
+config.flash_obj_root = r"@CMAKE_BINARY_DIR@"
+config.flash_src_root = r"@CMAKE_SOURCE_DIR@"
+config.flash_opt_tool = r"@CMAKE_BINARY_DIR@/tools/flash-opt/flash-opt"
+
+# Load the main config
+lit_config.load_config(config, r"@CMAKE_CURRENT_SOURCE_DIR@/lit.cfg.py")

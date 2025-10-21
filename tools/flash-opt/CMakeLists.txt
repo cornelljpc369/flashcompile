@@ -7,7 +7,7 @@ add_llvm_executable(flash-opt
 
 target_link_libraries(flash-opt
   PRIVATE
-  MLIRFlashDialect
+  FlashDialect
   ${dialect_libs}
   ${conversion_libs}
   MLIROptLib

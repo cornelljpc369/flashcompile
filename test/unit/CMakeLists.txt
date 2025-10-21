@@ -17,7 +17,7 @@ target_include_directories(test_dialect
 # Link libraries - simplified approach for macOS/Homebrew
 target_link_libraries(test_dialect
   PRIVATE
-  MLIRFlashDialect
+  FlashDialect
   ${dialect_libs}
   MLIRIR
   MLIRParser
