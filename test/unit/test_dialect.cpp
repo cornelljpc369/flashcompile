@@ -355,7 +355,37 @@ bool test_SimpleLayer() {
   
   return true;
 }
+//===----------------------------------------------------------------------===//
+// Test 11: Conv2D Operation Parsing
+//===----------------------------------------------------------------------===//
 
+bool test_Conv2DOpParsing() {
+  MLIRContext ctx;
+  ctx.getOrLoadDialect<FlashDialect>();
+  ctx.getOrLoadDialect<func::FuncDialect>();
+  
+  const char *moduleStr = R"mlir(
+    module {
+      func.func @test(%input: tensor<1x3x32x32xf32>, %kernel: tensor<64x3x3x3xf32>) -> tensor<1x64x30x30xf32> {
+        %0 = flash.conv2d %input, %kernel : tensor<1x3x32x32xf32>, tensor<64x3x3x3xf32> -> tensor<1x64x30x30xf32>
+        return %0 : tensor<1x64x30x30xf32>
+      }
+    }
+  )mlir";
+  
+  OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, &ctx);
+  ASSERT(module, "Module with Conv2D should parse successfully");
+  
+  // Find Conv2D operation
+  bool foundConv = false;
+  module->walk([&](Operation *op) {
+    if (op->getName().getStringRef() == "flash.conv2d")
+      foundConv = true;
+  });
+  
+  ASSERT(foundConv, "Should find flash.conv2d operation");
+  return true;
+}
 //===----------------------------------------------------------------------===//
 // Main
 //===----------------------------------------------------------------------===//
@@ -374,10 +404,11 @@ int main(int argc, char **argv) {
   TEST(AddOpParsing);           // NEW
   TEST(ReLUOpParsing);          // NEW
   TEST(SimpleLayer);            // NEW
+  TEST(Conv2DOpParsing);       // NEW!
   
-  llvm::outs() << "[----------] 10 tests from FlashDialect (" 
+  llvm::outs() << "[----------] 11 tests from FlashDialect (" 
                << (passCount + failCount) << " ms total)\n\n";
-  llvm::outs() << "[==========] 10 tests from 1 test suite ran.\n";
+  llvm::outs() << "[==========] 11 tests from 1 test suite ran.\n";
   llvm::outs() << "[  PASSED  ] " << passCount << " tests.\n";
   
   if (failCount > 0) {

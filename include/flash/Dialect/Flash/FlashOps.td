@@ -118,4 +118,41 @@ def Flash_ReLUOp : Flash_Op<"relu", [Pure]> {
     $input attr-dict `:` type($input) `->` type($result)
   }];
 }
+
+//===----------------------------------------------------------------------===//
+// Conv2D Operation
+//===----------------------------------------------------------------------===//
+
+def Flash_Conv2DOp : Flash_Op<"conv2d", [Pure]> {
+  let summary = "2D Convolution operation";
+  
+  let description = [{
+    Performs 2D convolution: output = conv2d(input, kernel)
+    
+    Input format: NCHW (batch, channels, height, width)
+    Kernel format: OIHW (out_channels, in_channels, kernel_h, kernel_w)
+    
+    Example:
+```mlir
+    %output = flash.conv2d %input, %kernel : tensor<1x3x32x32xf32>, tensor<64x3x3x3xf32> -> tensor<1x64x30x30xf32>
+```
+    
+    Note: This simplified version assumes stride=1, padding=0, dilation=1.
+    Full attribute support will be added in later optimization passes.
+  }];
+  
+  let arguments = (ins 
+    AnyTensor:$input,
+    AnyTensor:$kernel
+  );
+  
+  let results = (outs 
+    AnyTensor:$result
+  );
+  
+  let assemblyFormat = [{
+    $input `,` $kernel attr-dict `:` type($input) `,` type($kernel) `->` type($result)
+  }];
+}
+
 //#endif //FLASH_OPS
