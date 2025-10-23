@@ -184,8 +184,11 @@ struct ConvertLinalgToAffinePass
     
     ConversionTarget target(getContext());
     
-    // Linalg ops are illegal
-    target.addIllegalDialect<linalg::LinalgDialect>();
+    // Only MatMul is illegal (we have a pattern for it)
+    target.addIllegalOp<linalg::MatmulOp>();
+  
+    // Other Linalg ops are legal (let them pass through)
+    target.addLegalDialect<linalg::LinalgDialect>();
     
     // Affine, MemRef, Arith, Tensor ops are legal
     target.addLegalDialect<affine::AffineDialect,
