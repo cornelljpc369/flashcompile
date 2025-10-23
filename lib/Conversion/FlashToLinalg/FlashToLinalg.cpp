@@ -29,8 +29,7 @@ namespace {
 struct MatMulOpLowering : public OpRewritePattern<MatMulOp> {
   using OpRewritePattern<MatMulOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(MatMulOp op,
-                                 PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(MatMulOp op,PatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
     Value lhs = op.getLhs();
     Value rhs = op.getRhs();
@@ -60,15 +59,97 @@ struct MatMulOpLowering : public OpRewritePattern<MatMulOp> {
 
 } // namespace
 
+/// Lower flash.add to linalg.add
+
+struct AddOpLowering : public OpRewritePattern<AddOp>{
+  using OpRewritePattern<AddOp>::OpRewritePattern;
+  
+  LogicalResult matchAndRewrite(AddOp op,PatternRewriter &rewriter) const override {
+    Location loc = op.getLoc();
+    Value lhs = op.getLhs();
+    Value rhs = op.getRhs();
+
+    // Get result type
+    auto resultType = llvm::cast<RankedTensorType>(op.getResult().getType());
+
+    // Create empty tensor for output
+    Value emptyTensor = rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(), resultType.getElementType());
+
+    // Create linalg.add
+    Value result = rewriter.create<linalg::AddOp>(
+        loc, 
+        ValueRange{lhs, rhs},       // inputs
+        ValueRange{emptyTensor}     // output
+    ).getResult(0);
+    // Replace flash.add with linalg.add result
+    rewriter.replaceOp(op, result);
+    
+    return success();
+  }
+};
+
+/// Lower flash.relu to linalg.generic with max(0, x)
+struct ReLUOpLowering : public OpRewritePattern<ReLUOp> {
+  using OpRewritePattern<ReLUOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(ReLUOp op, PatternRewriter &rewriter) const override {
+
+    Location loc = op.getLoc();
+    Value input = op.getInput();
+
+    // Get result type
+    auto resultType = llvm::cast<RankedTensorType>(op.getResult().getType());
+
+    // Create empty tensor for output
+    Value emptyTensor = rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(), resultType.getElementType());
+
+    // Create affine maps for linalg.generic
+    // We want: out[i, j, ...] = max(0, in[i, j, ...])
+    // This is an "identity" map - output indices = input indices
+
+    int64_t rank = resultType.getRank();
+    SmallVector<AffineMap> indexingMaps;
+    indexingMaps.push_back(rewriter.getMultiDimIdentityMap(rank)); // input
+    indexingMaps.push_back(rewriter.getMultiDimIdentityMap(rank)); // output
+
+    // Iterator types: all "parallel" (no reductions)
+    SmallVector<utils::IteratorType> iteratorTypes(rank, utils::IteratorType::parallel);
+
+    // Create linalg.generic operation
+    auto genericOp = rewriter.create<linalg::GenericOp>(
+      loc,
+      /*resultTypes=*/TypeRange{resultType},
+      /*inputs=*/ValueRange{input},
+      /*outputs=*/ValueRange{emptyTensor},
+      /*indexingMaps=*/indexingMaps,
+      /*iteratorTypes=*/iteratorTypes,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
+        // Body of the operation: compute max(0, x)
+        // args[0] = input element
+        // args[1] = output element (uninitialized)
+        Value inputElem = args[0];
+        // Create constant 0.0
+        Value zero = b.create<arith::ConstantOp>(loc, b.getFloatAttr(resultType.getElementType(), 0.0));
+        // Compute max(0, input)
+        Value result = b.create<arith::MaximumFOp>(loc, zero, inputElem);
+        // Yield the result
+        b.create<linalg::YieldOp>(loc, result);
+      }
+    );
+    // Replace flash.relu with linalg.generic result
+    rewriter.replaceOp(op, genericOp.getResult(0));
+
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Pass Definition
 //===----------------------------------------------------------------------===//
 
 namespace {
 
-struct ConvertFlashToLinalgPass
-    : public PassWrapper<ConvertFlashToLinalgPass, 
-                        OperationPass<func::FuncOp>> {
+struct ConvertFlashToLinalgPass: public PassWrapper<ConvertFlashToLinalgPass, OperationPass<func::FuncOp>> {
   
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ConvertFlashToLinalgPass)
   
@@ -104,7 +185,7 @@ struct ConvertFlashToLinalgPass
     
     // Set up rewrite patterns
     RewritePatternSet patterns(&getContext());
-    patterns.add<MatMulOpLowering>(&getContext());
+    patterns.add<MatMulOpLowering, AddOpLowering, ReLUOpLowering>(&getContext());
     
     // Apply the patterns
     if (failed(applyPartialConversion(func, target, std::move(patterns)))) {
