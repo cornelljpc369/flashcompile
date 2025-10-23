@@ -9,6 +9,7 @@ target_link_libraries(flash-opt
   PRIVATE
   MLIRFlashDialect
   MLIRFlashToLinalg
+  MLIRLinalgToAffine
   ${dialect_libs}
   ${conversion_libs}
   MLIROptLib

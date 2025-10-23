@@ -37,4 +37,31 @@ def ConvertFlashToLinalg : Pass<"convert-flash-to-linalg", "::mlir::func::FuncOp
   ];
 }
 
+//===----------------------------------------------------------------------===//
+// ConvertLinalgToAffine Pass
+//===----------------------------------------------------------------------===//
+
+def ConvertLinalgToAffine : Pass<"convert-linalg-to-affine", "::mlir::func::FuncOp"> {
+  let summary = "Convert Linalg operations to Affine loops";
+  
+  let description = [{
+    This pass lowers Linalg structured operations to explicit Affine loop nests.
+    
+    Transformations:
+    - linalg.matmul → triple nested affine.for (i, j, k loops)
+    - linalg.add → double nested affine.for (i, j loops)
+    - linalg.generic → affine.for based on iterator types
+    
+    This exposes explicit loop structure for polyhedral optimization.
+  }];
+  
+  let constructor = "mlir::flash::createConvertLinalgToAffinePass()";
+  
+  let dependentDialects = [
+    "mlir::affine::AffineDialect",
+    "mlir::memref::MemRefDialect",
+    "mlir::arith::ArithDialect"
+  ];
+}
+
 #endif // FLASH_CONVERSION_PASSES
