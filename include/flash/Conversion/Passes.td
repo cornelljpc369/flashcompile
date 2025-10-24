@@ -64,4 +64,32 @@ def ConvertLinalgToAffine : Pass<"convert-linalg-to-affine", "::mlir::func::Func
   ];
 }
 
+//===----------------------------------------------------------------------===//
+// ConvertAffineToSCF Pass
+//===----------------------------------------------------------------------===//
+
+def ConvertAffineToSCF : Pass<"convert-affine-to-scf-custom", "::mlir::func::FuncOp"> {
+  let summary = "Convert Affine operations to SCF (Structured Control Flow)";
+  
+  let description = [{
+    This pass lowers Affine dialect operations to SCF dialect.
+    
+    Transformations:
+    - affine.for → scf.for with explicit bounds
+    - affine.load → memref.load
+    - affine.store → memref.store
+    - affine.if → scf.if
+    
+    This creates a uniform loop representation before LLVM lowering.
+  }];
+  
+  let constructor = "mlir::flash::createConvertAffineToSCFPass()";
+  
+  let dependentDialects = [
+    "mlir::scf::SCFDialect",
+    "mlir::memref::MemRefDialect",
+    "mlir::arith::ArithDialect"
+  ];
+}
+
 #endif // FLASH_CONVERSION_PASSES

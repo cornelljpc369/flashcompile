@@ -1,0 +1,22 @@
+add_mlir_library(MLIRAffineToSCF
+  AffineToSCF.cpp
+
+  ADDITIONAL_HEADER_DIRS
+  ${PROJECT_SOURCE_DIR}/include/flash/Conversion
+
+  DEPENDS
+  MLIRFlashConversionPassIncGen
+
+  LINK_LIBS PUBLIC
+  MLIRAffineDialect
+  MLIRAffineToStandard 
+  MLIRArithDialect
+  MLIRFuncDialect
+  MLIRMemRefDialect
+  MLIRSCFDialect
+  MLIRTensorDialect
+  MLIRIR
+  MLIRPass
+  MLIRTransforms
+  MLIRSupport
+)

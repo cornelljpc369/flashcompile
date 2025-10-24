@@ -1,2 +1,3 @@
 add_subdirectory(FlashToLinalg)
 add_subdirectory(LinalgToAffine)
+add_subdirectory(AffineToSCF)

@@ -19,6 +19,9 @@ std::unique_ptr<Pass> createConvertFlashToLinalgPass();
 /// Create a pass to convert Linalg operations to Affine loops
 std::unique_ptr<Pass> createConvertLinalgToAffinePass();
 
+/// Create a pass to convert Affine operations to SCF
+std::unique_ptr<Pass> createConvertAffineToSCFPass();
+
 /// Generate pass registration code
 #define GEN_PASS_REGISTRATION
 #include "flash/Conversion/Passes.h.inc"

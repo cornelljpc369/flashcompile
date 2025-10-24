@@ -10,6 +10,7 @@ target_link_libraries(flash-opt
   MLIRFlashDialect
   MLIRFlashToLinalg
   MLIRLinalgToAffine
+  MLIRAffineToSCF
   ${dialect_libs}
   ${conversion_libs}
   MLIROptLib
