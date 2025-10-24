@@ -84,6 +84,7 @@ echo -e "${YELLOW}[1/3]${NC} Lowering to LLVM dialect..."
   --convert-flash-to-linalg \
   --one-shot-bufferize \
   --convert-linalg-to-loops \
+  --convert-bufferization-to-memref \
   --lower-affine \
   --convert-scf-to-cf \
   --convert-cf-to-llvm \
