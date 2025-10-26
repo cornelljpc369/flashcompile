@@ -41,7 +41,7 @@ def ConvertFlashToLinalg : Pass<"convert-flash-to-linalg", "::mlir::func::FuncOp
 // ConvertLinalgToAffine Pass
 //===----------------------------------------------------------------------===//
 
-def ConvertLinalgToAffine : Pass<"convert-linalg-to-affine", "::mlir::func::FuncOp"> {
+/*def ConvertLinalgToAffine : Pass<"convert-linalg-to-affine", "::mlir::func::FuncOp"> {
   let summary = "Convert Linalg operations to Affine loops";
   
   let description = [{
@@ -91,5 +91,5 @@ def ConvertAffineToSCF : Pass<"convert-affine-to-scf-custom", "::mlir::func::Fun
     "mlir::arith::ArithDialect"
   ];
 }
-
+*/
 #endif // FLASH_CONVERSION_PASSES
