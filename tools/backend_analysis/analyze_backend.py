@@ -348,7 +348,25 @@ def analyze_registers(asm_path: Path) -> RegisterStats:
     except Exception as e:
         print(f"{Colors.RED}Register analysis error: {e}{Colors.RESET}")
         return stats
+def calculate_arithmetic_intensity(inst_stats: InstructionStats, operation_type: str = "unknown") -> float:
+    """
+    Calculate arithmetic intensity (FLOPs/byte) more accurately
     
+    This is approximate since we don't have exact FLOP counts from assembly,
+    but we can estimate based on float operations and memory operations.
+    """
+    # Estimate FLOPs from float operations (each float op ≈ 1 FLOP)
+    flops = inst_stats.float_ops
+    
+    # Estimate bytes moved (assuming 4 bytes per float)
+    # Each load/store is approximately 4 bytes
+    bytes_moved = (inst_stats.load_instructions + inst_stats.store_instructions) * 4
+    
+    if bytes_moved == 0:
+        return 0.0
+    
+    ai = flops / bytes_moved
+    return ai 
 #==============================================================================
 # Optimization Suggestions
 #==============================================================================
@@ -359,31 +377,68 @@ def suggest_optimizations(inst_stats: InstructionStats, reg_stats: RegisterStats
     
     suggestions = []
     
+    # Calculate arithmetic intensity
+    ai = calculate_arithmetic_intensity(inst_stats)
+    print_detail("Arithmetic Intensity", f"{ai:.4f} FLOPs/byte")
+    
+    # Hardware ridge points (approximate)
+    ridge_points = {
+        "CPU (Intel/AMD)": 14.0,
+        "GPU (NVIDIA V100)": 17.0,
+        "GPU (NVIDIA A100)": 10.0,
+        "Apple M1": 13.0,
+        "TPU v4": 229.0
+    }
+    
+    print(f"\n{Colors.CYAN}Ridge Points for Reference:{Colors.RESET}")
+    for hw, ridge in ridge_points.items():
+        if ai < ridge:
+            bound = f"{Colors.RED}Memory-bound{Colors.RESET}"
+        else:
+            bound = f"{Colors.GREEN}Compute-bound{Colors.RESET}"
+        print(f"  {hw:25} : {ridge:6.1f} FLOPs/byte → {bound}")
+    
+    print()
+    
+    # Determine if memory or compute bound (use A100 ridge point as default)
+    default_ridge = 10.0
+    if ai < default_ridge:
+        print_warning(f"Memory-bound operation (AI={ai:.2f} < ridge={default_ridge})")
+        print(f"  {Colors.YELLOW}→ Optimize data movement, improve cache locality{Colors.RESET}")
+    else:
+        print_info(f"Compute-bound operation (AI={ai:.2f} >= ridge={default_ridge})")
+        print(f"  {Colors.GREEN}→ Optimize computation, consider algorithmic improvements{Colors.RESET}")
+    
+    print()
+    
     # Check for vectorization opportunities
     if inst_stats.float_ops > 4 and inst_stats.vector_ops == 0:
-        suggestions.append("⚡ Vectorization: Many scalar float ops detected. Consider SIMD vectorization.")
+        suggestions.append("⚡ Vectorization: Many scalar float ops detected. SIMD can provide 4-8x speedup.")
     
-    # Check memory operations
-    mem_ratio = (inst_stats.load_instructions + inst_stats.store_instructions) / max(inst_stats.total_instructions, 1)
+    # Check memory operations ratio
+    mem_ops = inst_stats.load_instructions + inst_stats.store_instructions
+    mem_ratio = mem_ops / max(inst_stats.total_instructions, 1)
     if mem_ratio > 0.3:
-        suggestions.append(f"⚡ Memory bandwidth: {mem_ratio*100:.1f}% memory ops. Consider loop tiling or register reuse.")
+        suggestions.append(f"⚡ Memory bandwidth: {mem_ratio*100:.1f}% memory ops. Loop tiling or data reuse can help.")
     
     # Check register pressure
     if reg_stats.spills > 0:
-        suggestions.append(f"⚡ Register spills: {reg_stats.spills} detected. Consider reducing loop body size or register blocking.")
+        suggestions.append(f"⚡ Register spills: {reg_stats.spills} detected. Reduce live ranges or use register blocking.")
     
-    # Check arithmetic intensity
-    if inst_stats.arithmetic_ops < 10:
-        suggestions.append("⚡ Low arithmetic intensity: Consider loop unrolling or fusion for more computation per memory access.")
+    # Low arithmetic intensity
+    if ai < 1.0:
+        suggestions.append(f"⚡ Very low AI ({ai:.2f}): This operation is memory-bound on ALL hardware.")
+        suggestions.append("   → Consider: fusion with other ops, in-place operations, or better cache blocking")
     
     # Branch density
     branch_ratio = inst_stats.branches / max(inst_stats.total_instructions, 1)
     if branch_ratio > 0.1:
-        suggestions.append(f"⚡ High branch density: {branch_ratio*100:.1f}%. Consider loop unrolling or predication.")
+        suggestions.append(f"⚡ High branch density: {branch_ratio*100:.1f}%. Loop unrolling or predication may help.")
     
     if suggestions:
+        print(f"{Colors.YELLOW}Optimization Suggestions:{Colors.RESET}")
         for suggestion in suggestions:
-            print_warning(suggestion)
+            print(f"  {suggestion}")
     else:
         print_info("Code looks well-optimized! No obvious opportunities found.")
 #==============================================================================
