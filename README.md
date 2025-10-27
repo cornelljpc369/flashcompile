@@ -467,7 +467,7 @@ class GPUSimulator:
 | Add | 1024 elem | 0.003ms | 0.004ms | **1.33×** |
 | ReLU | 1024 elem | 0.003ms | 0.004ms | **1.33×** |
 
-*Benchmarked on: Apple M1, macOS, LLVM 21.1.1*
+*Benchmarked on: Apple M4, macOS, LLVM 21.1.1*
 
 ### Backend Analysis Insights
 
@@ -494,7 +494,7 @@ class GPUSimulator:
 ---
 ---
 
-## 🖥️ Hardware Simulation (Day 3)
+## 🖥️ Hardware Simulation 
 
 ### The Challenge
 
