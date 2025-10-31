@@ -27,7 +27,7 @@ std::unique_ptr<Pass> createConstantFoldingPass();
 
 /// Eliminate common subexpressions
 /// Example: x = a+b; y = a+b; → x = a+b; y = x;
-std::unique_ptr<Pass> createCSEPass();
+std::unique_ptr<Pass> createCommonSubexpressionEliminationPass();
 
 /// Remove unused operations
 std::unique_ptr<Pass> createDeadCodeEliminationPass();

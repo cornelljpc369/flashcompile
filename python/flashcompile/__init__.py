@@ -1,11 +1,5 @@
 """
 FlashCompile - Python API for Flash ML Compiler
-
-A production-ready ML compiler with Python interface, providing:
-- NumPy integration
-- Automatic IR generation
-- Compilation and execution
-- Performance benchmarking
 """
 
 __version__ = "0.1.0"
@@ -24,6 +18,8 @@ from .api import (
     relu,
 )
 
+from .cache import get_cache
+
 __all__ = [
     # Core API
     'compile',
@@ -36,4 +32,7 @@ __all__ = [
     'matmul',
     'add',
     'relu',
+    
+    # Cache
+    'get_cache',
 ]

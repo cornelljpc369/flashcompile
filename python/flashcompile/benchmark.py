@@ -92,25 +92,63 @@ def benchmark_matmul(
     """
     from .api import matmul
     
+    # Set seed for reproducibility
+    np.random.seed(42)
+    
     results = []
     
     for M, K, N in sizes:
-        print(f"Benchmarking MatMul {M}×{K} @ {K}×{N}...", end=' ')
+        print(f"Benchmarking MatMul {M}×{K} @ {K}×{N}...", end=' ', flush=True)
         
-        A = np.random.randn(M, K).astype(np.float32)
-        B = np.random.randn(K, N).astype(np.float32)
+        # Use uniform distribution to avoid overflow
+        A = np.random.uniform(-1.0, 1.0, (M, K)).astype(np.float32)
+        B = np.random.uniform(-1.0, 1.0, (K, N)).astype(np.float32)
         
-        flash_fn = lambda: matmul(A, B, execute=True, verbose=False)
-        numpy_fn = lambda: A @ B
+        # Flash: compile + execute each time
+        flash_times = []
+        for i in range(warmup + num_runs):
+            start = time.perf_counter()
+            _ = matmul(A, B, execute=True, verbose=False)
+            elapsed = time.perf_counter() - start
+            if i >= warmup:  # Skip warmup runs
+                flash_times.append(elapsed)
         
-        result = benchmark_operation(
-            flash_fn, numpy_fn, [A, B],
-            f"matmul_{M}x{K}x{N}",
-            num_runs, warmup
+        flash_time = sum(flash_times) / len(flash_times)
+        
+        # NumPy: just execution
+        for _ in range(warmup):
+            _ = A @ B
+        
+        numpy_times = []
+        for _ in range(num_runs):
+            start = time.perf_counter()
+            _ = A @ B
+            numpy_times.append(time.perf_counter() - start)
+        
+        numpy_time = sum(numpy_times) / len(numpy_times)
+        
+        speedup = numpy_time / flash_time if flash_time > 0 else 0
+        
+        result = BenchmarkResult(
+            operation=f"matmul_{M}x{K}x{N}",
+            shape=(M, K, N),
+            flash_time=flash_time,
+            numpy_time=numpy_time,
+            speedup=speedup,
+            num_runs=num_runs
         )
         
         results.append(result)
-        print(f"✓ Speedup: {result.speedup:.2f}x")
+        
+        # Color code speedup
+        if speedup >= 1.0:
+            color = '\033[92m'  # Green
+        elif speedup >= 0.5:
+            color = '\033[93m'  # Yellow
+        else:
+            color = '\033[91m'  # Red
+        
+        print(f"{color}✓ Speedup: {result.speedup:.2f}x\033[0m")
     
     return results
 
@@ -126,17 +164,20 @@ def benchmark_suite() -> Dict[str, List[BenchmarkResult]]:
     print("=" * 70)
     print()
     
+    print("\033[93mNOTE: Timings include compilation overhead.\033[0m")
+    print("\033[93mIn production, compile once and execute many times!\033[0m")
+    print()
+    
     # Matrix multiply benchmarks
     print("Matrix Multiplication:")
     print("-" * 70)
     matmul_sizes = [
-        (32, 32, 32),
-        (64, 64, 64),
-        (128, 128, 128),
-        (256, 256, 256),
-        (512, 512, 512),
+        (8, 8, 8),      # Tiny (compilation dominates)
+        (32, 32, 32),   # Small
+        (64, 64, 64),   # Medium
+        (128, 128, 128), # Large
     ]
-    matmul_results = benchmark_matmul(matmul_sizes, num_runs=50)
+    matmul_results = benchmark_matmul(matmul_sizes, num_runs=10, warmup=3)
     print()
     
     return {
