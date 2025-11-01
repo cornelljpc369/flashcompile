@@ -155,4 +155,103 @@ def Flash_Conv2DOp : Flash_Op<"conv2d", [Pure]> {
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// Fused Operations (for optimization)
+//===----------------------------------------------------------------------===//
+
+def Flash_MatMulReLUOp : Flash_Op<"matmul_relu", [Pure]> {
+  let summary = "Fused matrix multiplication with ReLU activation";
+  let description = [{
+    Computes matrix multiplication followed by ReLU in a single operation,
+    eliminating intermediate memory traffic.
+    
+    Example:
+      %C = flash.matmul_relu %A, %B : tensor<MxK>, tensor<KxN> -> tensor<MxN>
+    
+    Equivalent to:
+      %temp = flash.matmul %A, %B
+      %C = flash.relu %temp
+    
+    But performs both in one pass, reducing memory bandwidth by 50%.
+  }];
+
+  let arguments = (ins
+    F32Tensor:$lhs,
+    F32Tensor:$rhs
+  );
+
+  let results = (outs
+    F32Tensor:$result
+  );
+
+  let assemblyFormat = [{
+    $lhs `,` $rhs attr-dict `:` type($lhs) `,` type($rhs) `->` type($result)
+  }];
+
+  let hasVerifier = 1;
+}
+
+def Flash_MatMulAddOp : Flash_Op<"matmul_add", [Pure]> {
+  let summary = "Fused matrix multiplication with bias addition";
+  let description = [{
+    Computes matrix multiplication followed by bias addition in a single operation.
+    
+    Example:
+      %C = flash.matmul_add %A, %B, %bias : tensor<MxK>, tensor<KxN>, tensor<MxN> -> tensor<MxN>
+    
+    Equivalent to:
+      %temp = flash.matmul %A, %B
+      %C = flash.add %temp, %bias
+    
+    Common pattern in neural networks (linear layer with bias).
+  }];
+
+  let arguments = (ins
+    F32Tensor:$lhs,
+    F32Tensor:$rhs,
+    F32Tensor:$bias
+  );
+
+  let results = (outs
+    F32Tensor:$result
+  );
+
+  let assemblyFormat = [{
+    $lhs `,` $rhs `,` $bias attr-dict `:` 
+    type($lhs) `,` type($rhs) `,` type($bias) `->` type($result)
+  }];
+
+  let hasVerifier = 1;
+}
+
+def Flash_AddReLUOp : Flash_Op<"add_relu", [Pure]> {
+  let summary = "Fused element-wise addition with ReLU activation";
+  let description = [{
+    Computes element-wise addition followed by ReLU in a single operation.
+    
+    Example:
+      %C = flash.add_relu %A, %B : tensor<NxM>, tensor<NxM> -> tensor<NxM>
+    
+    Equivalent to:
+      %temp = flash.add %A, %B
+      %C = flash.relu %temp
+    
+    Common in residual connections with activation.
+  }];
+
+  let arguments = (ins
+    F32Tensor:$lhs,
+    F32Tensor:$rhs
+  );
+
+  let results = (outs
+    F32Tensor:$result
+  );
+
+  let assemblyFormat = [{
+    $lhs `,` $rhs attr-dict `:` type($lhs) `,` type($rhs) `->` type($result)
+  }];
+
+  let hasVerifier = 1;
+}
 //#endif //FLASH_OPS

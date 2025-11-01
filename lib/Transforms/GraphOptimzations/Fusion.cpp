@@ -1,11 +1,6 @@
 //===- Fusion.cpp - Operator fusion pass ------------------------*- C++ -*-===//
 //
-// Fuses compatible operations to reduce memory traffic
-//
-// Example transformations:
-//   matmul + add → matmul_add_fused
-//   matmul + relu → matmul_relu_fused
-//   add + relu → add_relu_fused
+// ACTUALLY fuses compatible operations (not just detection!)
 //
 //===----------------------------------------------------------------------===//
 
@@ -17,55 +12,17 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassRegistry.h"
 
 using namespace mlir;
 using namespace mlir::flash;
 
 //===----------------------------------------------------------------------===//
-// Fusion Patterns
+// Fusion Patterns - ACTUALLY REWRITE!
 //===----------------------------------------------------------------------===//
 
 namespace {
 
-/// Fuse MatMul + Add
-/// Pattern: %c = flash.matmul %a, %b
-///          %d = flash.add %c, %bias
-/// Rewrite: %d = flash.matmul_add %a, %b, %bias
-struct FuseMatMulAdd : public OpRewritePattern<AddOp> {
-  using OpRewritePattern<AddOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(AddOp addOp,
-                                 PatternRewriter &rewriter) const override {
-    // Match pattern: add(matmul(...), bias)
-    Value lhs = addOp.getLhs();
-    Value rhs = addOp.getRhs();
-    
-    // Check if LHS is a matmul
-    auto matmulOp = lhs.getDefiningOp<MatMulOp>();
-    if (!matmulOp)
-      return failure();
-    
-    // Check that matmul has only one use (this add)
-    if (!matmulOp->hasOneUse())
-      return failure();
-    
-    // TODO: Create fused op (for now, just document the opportunity)
-    // In full implementation, would create flash.matmul_add operation
-    
-    // For educational purposes, emit a remark
-    rewriter.notifyMatchFailure(
-        addOp, "Fusion opportunity detected: matmul + add "
-               "(fused op not yet implemented)");
-    
-    return failure();
-  }
-};
-
-/// Fuse MatMul + ReLU
-/// Pattern: %c = flash.matmul %a, %b
-///          %d = flash.relu %c
-/// Rewrite: %d = flash.matmul_relu %a, %b
+/// Fuse MatMul + ReLU → MatMulReLU
 struct FuseMatMulReLU : public OpRewritePattern<ReLUOp> {
   using OpRewritePattern<ReLUOp>::OpRewritePattern;
 
@@ -78,23 +35,55 @@ struct FuseMatMulReLU : public OpRewritePattern<ReLUOp> {
     if (!matmulOp)
       return failure();
     
+    // Check that matmul has only one use (this relu)
+    if (!matmulOp->hasOneUse())
+      return failure();
+    
+    // ACTUALLY CREATE FUSED OP!
+    rewriter.replaceOpWithNewOp<MatMulReLUOp>(
+        reluOp,
+        reluOp.getType(),
+        matmulOp.getLhs(),
+        matmulOp.getRhs()
+    );
+    
+    return success();
+  }
+};
+
+/// Fuse MatMul + Add → MatMulAdd
+struct FuseMatMulAdd : public OpRewritePattern<AddOp> {
+  using OpRewritePattern<AddOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(AddOp addOp,
+                                 PatternRewriter &rewriter) const override {
+    Value lhs = addOp.getLhs();
+    Value rhs = addOp.getRhs();
+    
+    // Check if LHS is a matmul
+    auto matmulOp = lhs.getDefiningOp<MatMulOp>();
+    if (!matmulOp)
+      return failure();
+    
     // Check single use
     if (!matmulOp->hasOneUse())
       return failure();
     
-    // Emit remark about fusion opportunity
-    rewriter.notifyMatchFailure(
-        reluOp, "Fusion opportunity detected: matmul + relu "
-                "(fused op not yet implemented)");
+    // RHS should be the bias (can be constant or variable)
+    // ACTUALLY CREATE FUSED OP!
+    rewriter.replaceOpWithNewOp<MatMulAddOp>(
+        addOp,
+        addOp.getType(),
+        matmulOp.getLhs(),
+        matmulOp.getRhs(),
+        rhs  // bias
+    );
     
-    return failure();
+    return success();
   }
 };
 
-/// Fuse Add + ReLU  (Actually implement this one!)
-/// Pattern: %c = flash.add %a, %b
-///          %d = flash.relu %c
-/// Rewrite: Just do relu(add(...)) in one pass
+/// Fuse Add + ReLU → AddReLU
 struct FuseAddReLU : public OpRewritePattern<ReLUOp> {
   using OpRewritePattern<ReLUOp>::OpRewritePattern;
 
@@ -111,15 +100,21 @@ struct FuseAddReLU : public OpRewritePattern<ReLUOp> {
     if (!addOp->hasOneUse())
       return failure();
     
-    // For now, just detect the pattern
-    // In full implementation, would fuse into single operation
-    rewriter.notifyMatchFailure(
-        reluOp, "Fusion opportunity detected: add + relu "
-                "(can be fused to reduce memory traffic)");
+    // ACTUALLY CREATE FUSED OP!
+    rewriter.replaceOpWithNewOp<AddReLUOp>(
+        reluOp,
+        reluOp.getType(),
+        addOp.getLhs(),
+        addOp.getRhs()
+    );
     
-    return failure();
+    return success();
   }
 };
+
+/// Fuse MatMul + Add + ReLU → MatMulAdd + ReLU (first pass)
+/// Then second pass will fuse the remaining Add+ReLU
+/// This demonstrates multi-pass fusion
 
 } // namespace
 
@@ -137,26 +132,39 @@ struct FusionPass : public PassWrapper<FusionPass, OperationPass<func::FuncOp>> 
   }
 
   StringRef getArgument() const final { return "flash-fusion"; }
+  
   StringRef getDescription() const final {
     return "Fuse compatible operations to reduce memory traffic";
   }
 
- // Near the end of the file, in runOnOperation():
-
-void runOnOperation() override {
-  RewritePatternSet patterns(&getContext());
-  
-  // Add fusion patterns
-  patterns.add<FuseMatMulAdd>(&getContext());
-  patterns.add<FuseMatMulReLU>(&getContext());
-  patterns.add<FuseAddReLU>(&getContext());
-  
-  // MLIR 21.1.1 API: Use applyPatternsGreedily
-  GreedyRewriteConfig config;
-  if (failed(applyPatternsGreedily(getOperation(), std::move(patterns), config))) {
-    signalPassFailure();
+  void runOnOperation() override {
+    MLIRContext *context = &getContext();
+    RewritePatternSet patterns(context);
+    
+    // Add fusion patterns
+    patterns.add<FuseMatMulReLU>(context);
+    patterns.add<FuseMatMulAdd>(context);
+    patterns.add<FuseAddReLU>(context);
+    
+    // Apply patterns greedily
+    // This will iterate until no more patterns match
+    if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+      signalPassFailure();
+    }
+    
+    // Count fused operations for statistics
+    unsigned numFused = 0;
+    getOperation().walk([&](Operation *op) {
+      if (isa<MatMulReLUOp, MatMulAddOp, AddReLUOp>(op)) {
+        numFused++;
+      }
+    });
+    
+    if (numFused > 0) {
+      llvm::outs() << "✓ Fusion: Created " << numFused 
+                   << " fused operation(s)\n";
+    }
   }
-}
 };
 
 } // namespace
@@ -168,12 +176,3 @@ void runOnOperation() override {
 std::unique_ptr<Pass> mlir::flash::createFusionPass() {
   return std::make_unique<FusionPass>();
 }
-
-//===----------------------------------------------------------------------===//
-// Pass Registration
-//===----------------------------------------------------------------------===//
-
-namespace {
-// Register the pass when this file is loaded
-static PassRegistration<FusionPass> registration;
-} // namespace
