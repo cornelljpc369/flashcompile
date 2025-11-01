@@ -30,16 +30,28 @@ std::unique_ptr<Pass> createCommonSubexpressionEliminationPass();
 std::unique_ptr<Pass> createDeadCodeEliminationPass();
 
 //===----------------------------------------------------------------------===//
-// Loop Optimizations (coming in Hours 29-36)
+// Loop Tiling
 //===----------------------------------------------------------------------===//
 
 /// Tile loops for better cache locality
+/// Splits loops into outer tile loops and inner element loops
+/// Example: for i in [0, N) → for ii in [0, N, tile), for i in [ii, ii+tile)
 std::unique_ptr<Pass> createLoopTilingPass(unsigned tileSize = 32);
 
+//===----------------------------------------------------------------------===//
+// Loop Interchange
+//===----------------------------------------------------------------------===//
+
 /// Interchange loops for better memory access patterns
+/// Reorders nested loops to improve spatial locality
 std::unique_ptr<Pass> createLoopInterchangePass();
 
-/// Unroll loops for better instruction-level parallelism
+//===----------------------------------------------------------------------===//
+// Loop Unrolling
+//===----------------------------------------------------------------------===//
+
+/// Unroll loops to reduce overhead and improve ILP
+/// Duplicates loop body to process multiple iterations together
 std::unique_ptr<Pass> createLoopUnrollingPass(unsigned factor = 4);
 
 //===----------------------------------------------------------------------===//

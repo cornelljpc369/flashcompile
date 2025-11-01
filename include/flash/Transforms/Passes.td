@@ -49,4 +49,37 @@ def CSEPass : Pass<"flash-cse", "func::FuncOp"> {
   let constructor = "mlir::flash::createCommonSubexpressionEliminationPass()";
 }
 
+//===----------------------------------------------------------------------===//
+// Loop Optimizations
+//===----------------------------------------------------------------------===//
+
+def LoopTilingPass : Pass<"flash-loop-tiling", "func::FuncOp"> {
+  let summary = "Tile loops for better cache locality";
+  let description = [{
+    Splits loops into outer tile loops and inner element loops to improve
+    cache locality and reduce cache misses.
+    
+    Example:
+      for i in [0, 1024):
+        for j in [0, 1024):
+          A[i][j] = ...
+    
+    Becomes:
+      for ii in [0, 1024, 32):
+        for jj in [0, 1024, 32):
+          for i in [ii, ii+32):
+            for j in [jj, jj+32):
+              A[i][j] = ...
+    
+    The tile (32×32) fits in L1 cache for maximum data reuse.
+  }];
+  
+  let constructor = "mlir::flash::createLoopTilingPass()";
+  
+  let options = [
+    Option<"tileSize", "tile-size", "unsigned", /*default=*/"32",
+           "Tile size for loop tiling">
+  ];
+}
+
 #endif // FLASH_OPTIMIZATION_PASSES

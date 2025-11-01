@@ -11,4 +11,5 @@ add_mlir_library(FlashTransforms
 )
 
 add_subdirectory(GraphOptimzations)
+add_subdirectory(LoopOptimizations)
 
