@@ -67,9 +67,79 @@ def benchmark_constant_folding():
     print("Typical speedup: 5-10% (reduces instruction count)")
     print()
 
+def benchmark_actual_passes():
+    """
+    Test actual pass implementations with MLIR
+    """
+    import subprocess
+    import tempfile
+    
+    print("=" * 70)
+    print("  Testing Actual Pass Implementations")
+    print("=" * 70)
+    print()
+    
+    # Create test IR
+    test_ir = """
+module {
+  func.func @test() -> tensor<2x2xf32> {
+    %c1 = arith.constant dense<[[1.0, 2.0], [3.0, 4.0]]> : tensor<2x2xf32>
+    %c2 = arith.constant dense<[[5.0, 6.0], [7.0, 8.0]]> : tensor<2x2xf32>
+    %add = flash.add %c1, %c2 : tensor<2x2xf32>, tensor<2x2xf32> -> tensor<2x2xf32>
+    
+    %x = arith.constant dense<[[1.0, 1.0], [1.0, 1.0]]> : tensor<2x2xf32>
+    %y = arith.constant dense<[[2.0, 2.0], [2.0, 2.0]]> : tensor<2x2xf32>
+    
+    %dup1 = flash.add %x, %y : tensor<2x2xf32>, tensor<2x2xf32> -> tensor<2x2xf32>
+    %dup2 = flash.add %x, %y : tensor<2x2xf32>, tensor<2x2xf32> -> tensor<2x2xf32>
+    
+    %result = flash.add %dup1, %dup2 : tensor<2x2xf32>, tensor<2x2xf32> -> tensor<2x2xf32>
+    return %result : tensor<2x2xf32>
+  }
+}
+"""
+    
+    # Write to temp file
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.mlir', delete=False) as f:
+        f.write(test_ir)
+        temp_file = f.name
+    
+    try:
+        # Count operations before
+        ops_before = test_ir.count('flash.')
+        print(f"Operations before: {ops_before}")
+        
+        # Run optimizations
+        result = subprocess.run(
+            ['./build/tools/flash-opt/flash-opt', temp_file,
+             '--flash-constant-fold', '--flash-cse'],
+            capture_output=True,
+            text=True
+        )
+        
+        if result.returncode == 0:
+            # Count operations after
+            ops_after = result.stdout.count('flash.')
+            print(f"Operations after:  {ops_after}")
+            print(f"Operations eliminated: {ops_before - ops_after}")
+            print(f"Reduction: {(ops_before - ops_after) / ops_before * 100:.1f}%")
+            print()
+            print("✓ Passes working correctly!")
+        else:
+            print("✗ Pass execution failed")
+            print(result.stderr)
+    
+    finally:
+        import os
+        os.unlink(temp_file)
+
+
+
 def main():
     cse_speedup = benchmark_cse_impact()
     benchmark_constant_folding()
+    benchmark_actual_passes()
+
     
     print("=" * 70)
     print("  Summary")

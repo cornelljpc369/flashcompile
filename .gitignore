@@ -23,3 +23,5 @@ __pycache__/
 *.so
 *.dylib
 setup_dir.sh
+
+tools/flash-run/

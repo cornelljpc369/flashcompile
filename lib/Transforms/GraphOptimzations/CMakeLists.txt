@@ -3,6 +3,10 @@ add_mlir_library(FlashOptimizationGraphOpts
   ConstantFolding.cpp
   CSE.cpp
 
+  DEPENDS
+  MLIRFlashOpsIncGen
+  MLIRFlashTransformsPassIncGen
+
   LINK_LIBS PUBLIC
   MLIRIR
   MLIRFlashDialect
@@ -10,4 +14,5 @@ add_mlir_library(FlashOptimizationGraphOpts
   MLIRFuncDialect
   MLIRTransforms
   MLIRPass
+  MLIRSupport
 )

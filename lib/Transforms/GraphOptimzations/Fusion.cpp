@@ -9,7 +9,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "flash/Optimization/Passes.h"
+#include "flash/Transforms/Passes.h"
 #include "flash/Dialect/Flash/FlashDialect.h"
 #include "flash/Dialect/Flash/FlashOps.h"
 
@@ -17,6 +17,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassRegistry.h"
 
 using namespace mlir;
 using namespace mlir::flash;
@@ -140,19 +141,22 @@ struct FusionPass : public PassWrapper<FusionPass, OperationPass<func::FuncOp>> 
     return "Fuse compatible operations to reduce memory traffic";
   }
 
-  void runOnOperation() override {
-    RewritePatternSet patterns(&getContext());
-    
-    // Add fusion patterns
-    patterns.add<FuseMatMulAdd>(&getContext());
-    patterns.add<FuseMatMulReLU>(&getContext());
-    patterns.add<FuseAddReLU>(&getContext());
-    
-    // Apply patterns greedily
-    if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
-      signalPassFailure();
-    }
+ // Near the end of the file, in runOnOperation():
+
+void runOnOperation() override {
+  RewritePatternSet patterns(&getContext());
+  
+  // Add fusion patterns
+  patterns.add<FuseMatMulAdd>(&getContext());
+  patterns.add<FuseMatMulReLU>(&getContext());
+  patterns.add<FuseAddReLU>(&getContext());
+  
+  // MLIR 21.1.1 API: Use applyPatternsGreedily
+  GreedyRewriteConfig config;
+  if (failed(applyPatternsGreedily(getOperation(), std::move(patterns), config))) {
+    signalPassFailure();
   }
+}
 };
 
 } // namespace
@@ -164,3 +168,12 @@ struct FusionPass : public PassWrapper<FusionPass, OperationPass<func::FuncOp>> 
 std::unique_ptr<Pass> mlir::flash::createFusionPass() {
   return std::make_unique<FusionPass>();
 }
+
+//===----------------------------------------------------------------------===//
+// Pass Registration
+//===----------------------------------------------------------------------===//
+
+namespace {
+// Register the pass when this file is loaded
+static PassRegistration<FusionPass> registration;
+} // namespace

@@ -5,7 +5,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "flash/Dialect/Flash/FlashDialect.h"
+#include "flash/Dialect/Flash/FlashOps.h"
 #include "flash/Conversion/Passes.h"
+#include "flash/Transforms/Passes.h"
 
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/InitAllDialects.h"
@@ -19,6 +21,9 @@ int main(int argc, char **argv) {
   // Register Flash conversion passes
   mlir::flash::registerFlashConversionPasses();
   
+  // // Register Flash Transform passes
+  mlir::flash::registerTransformPasses();
+
   mlir::DialectRegistry registry;
   
   // Register Flash dialect

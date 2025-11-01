@@ -9,6 +9,8 @@ target_link_libraries(flash-opt
   PRIVATE
   MLIRFlashDialect
   MLIRFlashToLinalg
+  FlashTransforms
+  FlashOptimizationGraphOpts
   # MLIRLinalgToAffine
   # MLIRAffineToSCF
   ${dialect_libs}

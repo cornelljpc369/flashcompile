@@ -1,6 +1,6 @@
-//===- Passes.h - Flash Transform Passes ------------------------*- C++ -*-===//
+//===- Passes.h - Optimization passes ---------------------------*- C++ -*-===//
 //
-// Graph-level optimization passes for Flash dialect
+// Optimization passes for Flash compiler
 //
 //===----------------------------------------------------------------------===//
 
@@ -18,22 +18,19 @@ namespace flash {
 //===----------------------------------------------------------------------===//
 
 /// Fuse compatible operations to reduce memory traffic
-/// Examples: matmul+add, matmul+relu, add+relu
 std::unique_ptr<Pass> createFusionPass();
 
 /// Fold constant operations at compile time
-/// Example: constant + constant → constant
 std::unique_ptr<Pass> createConstantFoldingPass();
 
 /// Eliminate common subexpressions
-/// Example: x = a+b; y = a+b; → x = a+b; y = x;
 std::unique_ptr<Pass> createCommonSubexpressionEliminationPass();
 
 /// Remove unused operations
 std::unique_ptr<Pass> createDeadCodeEliminationPass();
 
 //===----------------------------------------------------------------------===//
-// Loop Optimizations
+// Loop Optimizations (coming in Hours 29-36)
 //===----------------------------------------------------------------------===//
 
 /// Tile loops for better cache locality
@@ -46,20 +43,21 @@ std::unique_ptr<Pass> createLoopInterchangePass();
 std::unique_ptr<Pass> createLoopUnrollingPass(unsigned factor = 4);
 
 //===----------------------------------------------------------------------===//
-// Vectorization
+// Vectorization (coming in Hours 37-40)
 //===----------------------------------------------------------------------===//
 
 /// Vectorize operations to use SIMD instructions
 std::unique_ptr<Pass> createVectorizationPass();
 
-//===----------------------------------------------------------------------===//
-// Registration
-//===----------------------------------------------------------------------===//
+/// Generate declarations for all passes defined in Passes.td
+#define GEN_PASS_DECL
+#include "flash/Transforms/Passes.h.inc"
 
-/// Register all optimization passes
-void registerOptimizationPasses();
+/// Register all passes defined in Passes.td
+void registerTransformPasses();
 
-}// namespace flash
-}// namespace mlir
+
+} // namespace flash
+} // namespace mlir
 
 #endif // FLASH_TRANSFORMS_PASSES_H

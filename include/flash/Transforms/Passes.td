@@ -1,109 +1,52 @@
-//===- Passes.td - Flash Transform Passes ------------------*- tablegen -*-===//
+//===- Passes.td - Flash optimization passes ---------------*- tablegen -*-===//
 //
-// TableGen definitions for Flash optimization passes
+// Defines optimization passes for Flash compiler
 //
 //===----------------------------------------------------------------------===//
 
-// #ifndef FLASH_TRANSFORMS_PASSES
-// #define FLASH_TRANSFORMS_PASSES
+#ifndef FLASH_OPTIMIZATION_PASSES
+#define FLASH_OPTIMIZATION_PASSES
 
 include "mlir/Pass/PassBase.td"
 
 //===----------------------------------------------------------------------===//
-// Operator Fusion Pass
+// Graph Optimizations
 //===----------------------------------------------------------------------===//
 
-def OperatorFusionPass : Pass<"flash-operator-fusion", "func::FuncOp"> {
-  let summary = "Fuse compatible Flash operations";
+def FusionPass : Pass<"flash-fusion", "func::FuncOp"> {
+  let summary = "Fuse compatible operations to reduce memory traffic";
   let description = [{
-    Fuses sequences of operations that can be computed together efficiently.
-    
-    Example fusions:
-    - MatMul + Add → FusedMatMulAdd
-    - Add + ReLU → FusedAddReLU
-    - MatMul + Add + ReLU → FusedMatMulAddReLU
-    
-    Benefits:
-    - Reduced memory traffic
-    - Better cache locality
-    - Kernel launch overhead reduction (for GPU)
+    Fuses operations like matmul+relu, matmul+add, add+relu to reduce
+    memory bandwidth requirements and improve cache locality.
   }];
-  
-  let constructor = "mlir::flash::createOperatorFusionPass()";
-  
-  let dependentDialects = ["flash::FlashDialect"];
+  let constructor = "mlir::flash::createFusionPass()";
 }
 
-//===----------------------------------------------------------------------===//
-// Constant Folding Pass
-//===----------------------------------------------------------------------===//
-
-def ConstantFoldingPass : Pass<"flash-constant-folding", "func::FuncOp"> {
-  let summary = "Fold constant operations at compile time";
+def ConstantFoldingPass : Pass<"flash-constant-fold", "func::FuncOp"> {
+  let summary = "Fold constant expressions at compile time";
   let description = [{
-    Evaluates operations with constant inputs at compile time.
+    Evaluates operations on constant tensors at compile time, reducing
+    runtime computation overhead.
     
-    Example:
-      %c1 = arith.constant 2.0
-      %c2 = arith.constant 3.0
-      %sum = flash.add %c1, %c2  →  %sum = arith.constant 5.0
-    
-    Benefits:
-    - Reduces runtime computation
-    - Exposes more optimization opportunities
-    - Smaller graphs
+    Examples:
+      - flash.add constant(...), constant(...) → constant(sum)
+      - flash.relu constant(...) → constant(max(0, ...))
+      - x + 0 → x
   }];
-  
   let constructor = "mlir::flash::createConstantFoldingPass()";
-  
-  let dependentDialects = ["flash::FlashDialect", "arith::ArithDialect"];
 }
 
-//===----------------------------------------------------------------------===//
-// Common Subexpression Elimination (CSE)
-//===----------------------------------------------------------------------===//
-
-def CommonSubexpressionEliminationPass : Pass<"flash-cse", "func::FuncOp"> {
-  let summary = "Eliminate redundant computations";
+def CSEPass : Pass<"flash-cse", "func::FuncOp"> {
+  let summary = "Eliminate common subexpressions";
   let description = [{
-    Removes duplicate computations with the same inputs.
+    Eliminates redundant computations by reusing previously computed values.
     
     Example:
-      %r1 = flash.add %a, %b
-      %r2 = flash.add %a, %b  →  Use %r1 instead of computing again
-    
-    Benefits:
-    - Fewer operations
-    - Better register usage
-    - Reduced computation time
+      %1 = flash.add %a, %b
+      %2 = flash.add %a, %b  // Duplicate!
+      → Replace all uses of %2 with %1
   }];
-  
   let constructor = "mlir::flash::createCommonSubexpressionEliminationPass()";
-  
-  let dependentDialects = ["flash::FlashDialect"];
 }
 
-//===----------------------------------------------------------------------===//
-// Dead Code Elimination (DCE)
-//===----------------------------------------------------------------------===//
-
-def DeadCodeEliminationPass : Pass<"flash-dce", "func::FuncOp"> {
-  let summary = "Remove unused operations";
-  let description = [{
-    Removes operations whose results are never used.
-    
-    Example:
-      %unused = flash.matmul %a, %b  →  Remove (if %unused is never used)
-    
-    Benefits:
-    - Smaller IR
-    - Faster compilation
-    - No wasted computation
-  }];
-  
-  let constructor = "mlir::flash::createDeadCodeEliminationPass()";
-  
-  let dependentDialects = ["flash::FlashDialect"];
-}
-
-// #endif // FLASH_TRANSFORMS_PASSES
+#endif // FLASH_OPTIMIZATION_PASSES
